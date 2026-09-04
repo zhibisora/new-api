@@ -216,7 +216,13 @@ func Register(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailVerificationRequired)
 			return
 		}
-		if !common.VerifyCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose) {
+		verified, err := common.VerifyCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose)
+		if err != nil {
+			logger.LogError(c.Request.Context(), "failed to load registration verification code: "+err.Error())
+			common.ApiErrorI18n(c, i18n.MsgRetryLater)
+			return
+		}
+		if !verified {
 			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
 			return
 		}
@@ -1222,7 +1228,13 @@ func EmailBind(c *gin.Context) {
 	email := req.Email
 	email = model.NormalizeEmail(email)
 	code := req.Code
-	if !common.VerifyCodeWithKey(email, code, common.EmailVerificationPurpose) {
+	verified, err := common.VerifyCodeWithKey(email, code, common.EmailVerificationPurpose)
+	if err != nil {
+		logger.LogError(c.Request.Context(), "failed to load email binding verification code: "+err.Error())
+		common.ApiErrorI18n(c, i18n.MsgRetryLater)
+		return
+	}
+	if !verified {
 		common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
 		return
 	}
@@ -1231,7 +1243,7 @@ func EmailBind(c *gin.Context) {
 	user := model.User{
 		Id: id.(int),
 	}
-	err := user.FillUserById()
+	err = user.FillUserById()
 	if err != nil {
 		common.ApiError(c, err)
 		return
